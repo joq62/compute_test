@@ -14,7 +14,9 @@
 
 
 %% External exports
--export([install/1
+-export([install/1,
+	 start_restarted_nodes/1
+	 
 	]).
 
 -define(WAIT_FOR_TABLES,5000).
@@ -22,6 +24,45 @@
 %% ====================================================================
 %% External functions
 %% ====================================================================
+%% --------------------------------------------------------------------
+%% Function:start
+%% Description: List of test cases 
+%% Returns: non
+%% --------------------------------------------------------------------
+
+start_restarted_nodes(ExtraNodes)->
+    start_restarted_nodes(ExtraNodes,[]).  
+start_restarted_nodes([],R)->
+    R;
+start_restarted_nodes([Node|T],Acc) ->
+    R=case rpc:call(Node,compute,read_status,[]) of
+	  started->
+	      case gen_mnesia:add_node(Node) of
+		  ok->
+		      case rpc:call(Node,compute,set_status,[running]) of
+			  ok->
+			      ok;
+			  Err ->
+			      {error,[Err,Node,compute,set_status,[running],?MODULE,?FUNCTION_NAME,?LINE]}
+		      end;
+		  Err->
+		      {error,[Err,Node,add_node,?MODULE,?FUNCTION_NAME,?LINE]}
+	      end;
+	  running->
+	      ok;
+	  Err ->
+	      {error,[Err,Node,compute,read_status,[],?MODULE,?FUNCTION_NAME,?LINE]}
+      end,
+    start_restarted_nodes(T,[R|Acc]).
+			      
+
+
+%% --------------------------------------------------------------------
+%% Function:start
+%% Description: List of test cases 
+%% Returns: non
+%% --------------------------------------------------------------------
+
 install(ExternalNodes)->
     mnesia:stop(),
     mnesia:delete_schema([node()]),
@@ -30,28 +71,35 @@ install(ExternalNodes)->
     % init local
     ok=db_lock:create_table(),
     {atomic,ok}=db_lock:create(), 
-
+    add_extra_nodes(ExternalNodes,Table,[]).
     
-    % Ensure connected
-    R=[net_adm:ping(Node)||Node<-ExternalNodes],
-    io:format("~p~n",[{R,?MODULE,?LINE}]),
-    %add Nodes
-    
-    R_AddNode=[gen_mnesia:add_node(Node)||Node<-ExternalNodes],
-    Result=case [Err||Err<-R_AddNode,Err/=ok] of
-	       []->
-		   StorageType=ram_copies,    
-		   R_AddTable=[gen_mnesia:add_table(Node,Table,StorageType)||Node<-ExternalNodes],
-		   case [Err||Err<-R_AddTable,Err/=ok] of
-		       []->
-			   ok;
-		       _->
-			   {error,[R_AddTable,?MODULE,?FUNCTION_NAME,?LINE]}
-		   end;
-	       _->
-		   {error,[R_AddNode,?MODULE,?FUNCTION_NAME,?LINE]}
-	   end,
-    Result.
+    % Add extra nodes
+add_extra_nodes([],_Table,Result)->
+    Result;
+add_extra_nodes([Node|T],Table,Acc)->
+    R=case net_adm:ping(Node) of
+	  pang->
+	      {error,[pang,Node,?MODULE,?FUNCTION_NAME,?LINE]};
+	  pong->    %add Nodes
+    	      case gen_mnesia:add_node(Node) of
+		  ok->
+		      StorageType=ram_copies,    
+		      case gen_mnesia:add_table(Node,Table,StorageType) of
+			  ok->
+			      case rpc:call(Node,compute,set_status,[running]) of
+				  ok->
+				      ok;
+				  Err->
+				      {error,[Err,Node,compute,set_status,[running],?MODULE,?FUNCTION_NAME,?LINE]}
+			      end;
+			  Err->
+			      {error,[Err,add_table,Node,?MODULE,?FUNCTION_NAME,?LINE]}
+		      end;
+		  Err->
+		      {error,[Err,add_node,Node,?MODULE,?FUNCTION_NAME,?LINE]}
+	      end
+      end,
+    add_extra_nodes(T,Table,[R|Acc]).
 
 %% --------------------------------------------------------------------
 %% Function:start

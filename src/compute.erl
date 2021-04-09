@@ -3,7 +3,7 @@
 %%% @doc : represent a logical vm  
 %%% 
 %%% Supports the system with standard erlang vm functionality, load and start
-%%% of an erlang application (downloaded from git hub) and "dns" support 
+%%% of an erlang application downloaded from git hub) and "dns" support 
 %%% 
 %%% Make and start the board start SW.
 %%%  boot_service initiates tcp_server and l0isten on port
@@ -24,7 +24,8 @@
 %% Key Data structures
 %% 
 %% --------------------------------------------------------------------
--record(state,{nodes}).
+-record(state,{nodes,
+	       status}).
 
 %% --------------------------------------------------------------------
 
@@ -35,7 +36,9 @@
 
 %% server interface
 -export([install/0,
-	boot/0]).
+	 read_status/0,
+	 set_status/1,
+	 boot/0]).
 
 -export([add_node/1,
 	 delete_node/1,
@@ -78,7 +81,10 @@ stop()-> gen_server:call(?MODULE, {stop},infinity).
 %%----------------------------------------------------------------------
 install()->
     gen_server:call(?MODULE,{install},infinity).
-
+read_status()->
+    gen_server:call(?MODULE,{read_status},infinity).
+set_status(Status)->
+    gen_server:call(?MODULE,{set_status,Status},infinity).
 sys_info()->
     gen_server:call(?MODULE,{sys_info},infinity).
 add_table(Vm,Table,StorageType)->
@@ -133,7 +139,8 @@ init([]) ->
     [net_adm:ping(Node)||Node<-ExternalNodes],
     ok=application:start(gen_mnesia),
    % io:format("~p~n",[ExternalNodes]),
-    {ok, #state{nodes=ExternalNodes}}.
+    {ok, #state{nodes=ExternalNodes,
+		status=started}}.
 
 %% --------------------------------------------------------------------
 %% Function: handle_call/3
@@ -146,15 +153,25 @@ init([]) ->
 %%          {stop, Reason, State}            (aterminate/2 is called)
 %% --------------------------------------------------------------------
 handle_call({install}, _From, State) ->
-    Reply=rpc:call(node(),compute_lib,install,[State#state.nodes]),    
+    Reply=rpc:call(node(),compute_lib,install,[State#state.nodes]),
+    spawn(fun()->local_check_started_extra_node(State#state.nodes) end),
+    NewState=State#state{status=running},
+    {reply, Reply, NewState};
+
+handle_call({read_status}, _From, State) ->
+    Reply=State#state.status,
     {reply, Reply, State};
+
+handle_call({set_status,Status}, _From, State) ->
+    NewState=State#state{status=Status},
+    spawn(fun()->local_check_started_extra_node(State#state.nodes) end),
+    Reply=ok,
+    {reply, Reply, NewState};
 
 
 handle_call({ping}, _From, State) ->
     Reply={pong,node(),?MODULE},
     {reply, Reply, State};
-
-
 
 
 handle_call({sys_info}, _From, State) ->
@@ -233,7 +250,7 @@ handle_call(Request, From, State) ->
 %% --------------------------------------------------------------------
 
 handle_cast({check_started_extra_node}, State) ->
-    spawn(fun()->local_check_started_extra_node() end),  
+    spawn(fun()->local_check_started_extra_node(State#state.nodes) end),  
     {noreply, State};
 
 handle_cast(Msg, State) ->
@@ -285,14 +302,14 @@ code_change(_OldVsn, State, _Extra) ->
 %% --------------------------------------------------------------------
 %% Internal functions
 %% --------------------------------------------------------------------
-local_check_started_extra_node()->
+local_check_started_extra_node(ExtraNodes)->
     timer:sleep(?check_started_extra_node_time_out),
     Locked=db_lock:is_open(),
-    io:format("~p~n",[{?MODULE,?FUNCTION_NAME,?LINE,Locked}]),
+ %   io:format("~p~n",[{?MODULE,?FUNCTION_NAME,?LINE,Locked}]),
     case Locked of
 	false->
 	    do_nothing;
 	true->
-	    rpc:call(node(),gen_mnesia_lib,check_stopped_db_nodes,[])
+	    rpc:call(node(),compute_lib,start_restarted_nodes,[ExtraNodes])
     end,
-    gen_mnesia:check_started_extra_node().
+    compute:check_started_extra_node().

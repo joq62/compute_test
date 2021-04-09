@@ -12,7 +12,7 @@ all:
 	    -pa */ebin\
 	    -setcookie abc\
 	    -compute config_file nodes\
-	    -sname a\
+	    -sname compute\
 	    -mnesia dir mneisa_dir\
 	    -run compute boot
 
@@ -31,7 +31,7 @@ unit_test:
 	    -pa */ebin\
 	    -setcookie abc\
 	    -compute config_file nodes\
-	    -sname a\
+	    -sname compute\
 	    -mnesia dir mneisa_dir\
 	    -run compute_unit_test test
 test:
