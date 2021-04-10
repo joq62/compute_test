@@ -5,8 +5,7 @@
 -include_lib("stdlib/include/qlc.hrl").
 -include("db_lock.hrl").
 
--define(LockTimeOut, 15). %% 30 sec 
--define(LeaderLock,leader).
+-define(LockTimeOut, 10). %% 30 sec 
 -define(TABLE,lock).
 -define(RECORD,lock).
 
@@ -19,10 +18,10 @@ create_table(NodeList)->
     mnesia:wait_for_tables([?TABLE], 20000).
 
 
-create() ->
-    create(?LeaderLock,0).
-create({?MODULE,LockId}) ->
+create(LockId) ->
+    io:format("~p~n",[{LockId,?MODULE,?FUNCTION_NAME,?LINE}]),
     create(LockId,0).
+
 create(LockId,Time) ->
     F = fun() ->
 		Record=#?RECORD{lock_id=LockId,time=Time},		
@@ -47,8 +46,6 @@ read(LockId) ->
 		   X#?RECORD.lock_id==LockId])),
     [{YLockId,Time}||{?RECORD,YLockId,Time}<-Z].
 
-is_open()->
-    is_open(?LeaderLock).
 
 is_open(LockId)->
     is_open(LockId,?LockTimeOut).

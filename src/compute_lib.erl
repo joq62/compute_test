@@ -10,8 +10,8 @@
 %% Include files
 %% --------------------------------------------------------------------
 -include("src/db_lock.hrl").
+-include("src/compute.hrl").
 %% --------------------------------------------------------------------
-
 
 %% External exports
 -export([install/1,
@@ -51,6 +51,7 @@ start_restarted_nodes([Node|T],Acc) ->
 	  running->
 	      ok;
 	  Err ->
+	      
 	      {error,[Err,Node,compute,read_status,[],?MODULE,?FUNCTION_NAME,?LINE]}
       end,
     start_restarted_nodes(T,[R|Acc]).
@@ -70,7 +71,7 @@ install(ExternalNodes)->
     Table=lock,
     % init local
     ok=db_lock:create_table(),
-    {atomic,ok}=db_lock:create(), 
+    {atomic,ok}=db_lock:create(?DBASE_LEADER), 
     add_extra_nodes(ExternalNodes,Table,[]).
     
     % Add extra nodes

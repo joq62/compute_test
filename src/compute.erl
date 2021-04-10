@@ -17,9 +17,9 @@
 %% --------------------------------------------------------------------
 %% Include files
 %% --------------------------------------------------------------------
-%
+-include("src/compute.hrl").
 %% --------------------------------------------------------------------
--define(check_started_extra_node_time_out,10000).
+-define(check_started_extra_node_time_out,3000).
 %% --------------------------------------------------------------------
 %% Key Data structures
 %% 
@@ -304,7 +304,7 @@ code_change(_OldVsn, State, _Extra) ->
 %% --------------------------------------------------------------------
 local_check_started_extra_node(ExtraNodes)->
     timer:sleep(?check_started_extra_node_time_out),
-    Locked=db_lock:is_open(),
+    Locked=db_lock:is_open(?DBASE_LEADER),
  %   io:format("~p~n",[{?MODULE,?FUNCTION_NAME,?LINE,Locked}]),
     case Locked of
 	false->
