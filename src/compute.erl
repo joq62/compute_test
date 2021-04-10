@@ -38,6 +38,8 @@
 -export([install/0,
 	 read_status/0,
 	 set_status/1,
+	 create_vm/0,
+	 delete_vm/1,
 	 boot/0]).
 
 -export([add_node/1,
@@ -79,6 +81,12 @@ stop()-> gen_server:call(?MODULE, {stop},infinity).
 
 
 %%----------------------------------------------------------------------
+create_vm()->
+    gen_server:call(?MODULE,{create_vm},infinity).
+delete_vm(Vm)->
+    gen_server:call(?MODULE,{delete_vm,Vm},infinity).
+
+
 install()->
     gen_server:call(?MODULE,{install},infinity).
 read_status()->
@@ -152,11 +160,27 @@ init([]) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (aterminate/2 is called)
 %% --------------------------------------------------------------------
+handle_call({create_vm}, _From, State) ->
+    Reply=rpc:call(node(),compute_lib,create_vm,[]),
+    {reply, Reply, State};
+
+handle_call({delete_vm,Vm}, _From, State) ->
+    Reply=rpc:call(node(),compute_lib,delete_vm,[Vm]),
+    {reply, Reply, State};
+
+
+
 handle_call({install}, _From, State) ->
     Reply=rpc:call(node(),compute_lib,install,[State#state.nodes]),
     spawn(fun()->local_check_started_extra_node(State#state.nodes) end),
     NewState=State#state{status=running},
     {reply, Reply, NewState};
+
+
+handle_call({start_vm}, _From, State) ->
+    Reply=rpc:call(node(),compute_lib,start_vm,[]),
+    {reply, Reply, State};
+
 
 handle_call({read_status}, _From, State) ->
     Reply=State#state.status,

@@ -15,7 +15,9 @@
 
 %% External exports
 -export([install/1,
-	 start_restarted_nodes/1
+	 start_restarted_nodes/1,
+	 create_vm/0,
+	 delete_vm/1
 	 
 	]).
 
@@ -24,6 +26,35 @@
 %% ====================================================================
 %% External functions
 %% ====================================================================
+
+%% --------------------------------------------------------------------
+%% Function:start
+%% Description: List of test cases 
+%% Returns: non
+%% --------------------------------------------------------------------
+create_vm()->
+    NodeNameStr="worker_"++erlang:integer_to_list(erlang:system_time(millisecond)),
+    ok=file:make_dir(NodeNameStr),
+    {ok,Host}=inet:gethostname(),
+    NodeName=list_to_atom(NodeNameStr),   
+    {ok,Node}=slave:start(Host,NodeName,"-setcookie "++?Cookie),
+    {ok,Node}.
+
+delete_vm(Vm)->
+    VmId=atom_to_list(Vm), % 'worker_xxxx@Host"
+    io:format("~p~n",[{VmId,?MODULE,?FUNCTION_NAME,?LINE}]),
+    io:format("~p~n",[{string:tokens(VmId,"@"),?MODULE,?FUNCTION_NAME,?LINE}]),
+    [NodeNameStr,Host]=string:tokens(VmId,"@"),
+    io:format("~p~n",[{NodeNameStr,Host,?MODULE,?FUNCTION_NAME,?LINE}]),
+    os:cmd("rm -rf "++NodeNameStr), % del_dir_r OTP 23!!!!
+    slave:stop(Vm),
+    ok.
+    
+
+load_start_service(ServiceId,Source,DestinationDir,WorkerVm)->
+    glurk.
+    
+    
 %% --------------------------------------------------------------------
 %% Function:start
 %% Description: List of test cases 

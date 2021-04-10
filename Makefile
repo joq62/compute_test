@@ -16,6 +16,12 @@ all:
 	    -mnesia dir mneisa_dir\
 	    -run compute boot
 
+monkey:
+	erlc -o test_ebin test_src/monkey_test.erl;
+	erl -pa test_ebin\
+	    -setcookie abc\
+	    -sname monkey_test\
+	    -run monkey_test start
 unit_test:
 	rm -rf ebin/* src/*.beam *.beam test_src/*.beam test_ebin/*;
 	rm -rf gen_mnesia/ebin/*;
